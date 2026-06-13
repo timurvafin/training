@@ -8,11 +8,13 @@ node_modules/
 dist/
 test-results/
 playwright-report/
+# Локальные настройки Claude Code (per-machine)
+.claude/settings.local.json
 # Приватные файлы проекта — в монорепе они симлинки на ../training-private/ (реальные файлы
 # приватные). В публичном репо их быть не должно.
 /PRIVATE.md
 /JOURNAL.md
-/train-plans/
+/train-plans
 /.life/
 # Генерируемые артефакты Apps Script (собираются из *.ts)
 /app/index.html
