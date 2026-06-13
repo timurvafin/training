@@ -1,0 +1,123 @@
+/* ============================================================
+   Тренировки — hi-fi dark theme tokens
+   Графит-навигатор фон, синий акцент, зелёный/янтарный статусы.
+   --accent / --on-accent задаются из JS (Tweaks).
+   ============================================================ */
+
+:root {
+  --f-ui: 'Hanken Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --f-num: 'Space Grotesk', 'Hanken Grotesk', system-ui, sans-serif;
+
+  --tt: 50px;                 /* тач-цель (Tweak) */
+
+  /* graphite theme */
+  --page: #090b0f;
+  --app: #0f141b;
+  --surface: #171d26;
+  --surface-2: #1e2530;
+  --surface-3: #29313e;
+  --hair: rgba(255,255,255,0.075);
+  --hair-2: rgba(255,255,255,0.13);
+
+  --text: #eef1f6;
+  --text-2: #a4adbb;
+  --text-3: #6b7482;
+
+  --accent: #4c8dff;
+  --on-accent: #f7faff;
+  --accent-tint: color-mix(in oklab, var(--accent) 16%, transparent);
+  --accent-ring: color-mix(in oklab, var(--accent) 55%, transparent);
+
+  --ok: #2fbf71;
+  --ok-tint: color-mix(in oklab, var(--ok) 15%, transparent);
+  --warn: #f0a93b;
+  --warn-tint: color-mix(in oklab, var(--warn) 15%, transparent);
+  --danger: #f2655a;
+
+  --r-card: 20px;
+  --r-field: 14px;
+  --r-pill: 999px;
+  --shadow: 0 8px 30px rgba(0,0,0,0.45);
+  --shadow-sheet: 0 -14px 50px rgba(0,0,0,0.55);
+}
+
+.amoled {
+  --page: #000;
+  --app: #000;
+  --surface: #0b0e13;
+  --surface-2: #14181f;
+  --surface-3: #1d232c;
+  --hair: rgba(255,255,255,0.09);
+  --hair-2: rgba(255,255,255,0.16);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+#root { height: 100%; }
+body {
+  background: var(--page);
+  font-family: var(--f-ui);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- device stage ---- */
+.stage {
+  min-height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(76,141,255,0.06), transparent 60%),
+    var(--page);
+}
+.device {
+  width: 390px;
+  height: 844px;
+  background: var(--app);
+  border-radius: 40px;
+  border: 1px solid var(--hair-2);
+  box-shadow: var(--shadow), 0 0 0 10px #05070a;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.device-fit { position: absolute; left: 50%; top: 50%; transform-origin: center center; }
+
+/* ---- screen scaffold ---- */
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--app);
+}
+.statusbar {
+  height: 44px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px 0 28px;
+  font-size: 14px; font-weight: 600; letter-spacing: .3px;
+  color: var(--text);
+}
+.statusbar .sb-right { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.home-indicator {
+  position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%);
+  width: 134px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.25);
+  z-index: 60; pointer-events: none;
+}
+
+/* generic */
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+
+/* tap feedback */
+.tap { -webkit-tap-highlight-color: transparent; cursor: pointer; transition: transform .08s ease, background .15s ease, border-color .15s ease, color .15s; }
+.tap:active { transform: scale(0.97); }
+
+/* scroll area hides scrollbar */
+.scroll { overflow-y: auto; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }

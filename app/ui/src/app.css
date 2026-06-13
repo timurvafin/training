@@ -1,0 +1,625 @@
+/* ============================================================
+   Тренировки — дизайн-система «Графит» (Фаза 2 редизайна)
+   Токены + базовые компонентные классы из дизайн-хэндоффа
+   (design/hifi-v2/theme.css + app.css), перенесённые на :root.
+
+   Тема — только «Графит». AMOLED-токены оставлены в комментарии
+   «на будущее», без in-app переключателя (см. ниже).
+
+   Старые переменные (--bg/--card/--line/--txt/--muted/--err)
+   сохранены как АЛИАСЫ на новые токены, чтобы текущие компоненты
+   (ui/src/lib/*.svelte, App.svelte) не сломались до их переработки
+   в следующих фазах.
+   ============================================================ */
+
+@import './fonts.css';
+
+:root {
+  /* ---- шрифтовые стеки ---- */
+  --f-ui: 'Hanken Grotesk Variable', 'Hanken Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --f-num: 'Space Grotesk Variable', 'Space Grotesk', 'Hanken Grotesk Variable', system-ui, sans-serif;
+
+  /* ---- тач-цель ---- */
+  --tt: 50px;
+
+  /* ---- тема «Графит» (по умолчанию) ---- */
+  --page: #090b0f;        /* фон за телефоном */
+  --app: #0f141b;         /* фон экрана приложения */
+  --surface: #171d26;     /* карточки */
+  --surface-2: #1e2530;   /* поля ввода, кнопки */
+  --surface-3: #29313e;   /* заполненные/нажатые поля */
+  --hair: rgba(255, 255, 255, 0.075);  /* тонкие границы */
+  --hair-2: rgba(255, 255, 255, 0.13); /* границы поярче */
+
+  --text: #eef1f6;        /* основной текст */
+  --text-2: #a4adbb;      /* вторичный текст */
+  --text-3: #6b7482;      /* подписи/плейсхолдеры */
+
+  --accent: #4c8dff;      /* акцент (синий) */
+  --on-accent: #f7faff;   /* текст на акценте */
+  --accent-tint: color-mix(in oklab, var(--accent) 16%, transparent);
+  --accent-ring: color-mix(in oklab, var(--accent) 55%, transparent);
+
+  --ok: #2fbf71;          /* успех */
+  --ok-tint: color-mix(in oklab, var(--ok) 15%, transparent);
+  --warn: #f0a93b;        /* предупреждение/оффлайн */
+  --warn-tint: color-mix(in oklab, var(--warn) 15%, transparent);
+  --danger: #f2655a;      /* деструктив */
+
+  /* ---- радиусы / тени ---- */
+  --r-card: 20px;
+  --r-field: 14px;
+  --r-pill: 999px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --shadow-sheet: 0 -14px 50px rgba(0, 0, 0, 0.55);
+
+  /* ---- АЛИАСЫ старых переменных → новые токены (переходная совместимость) ---- */
+  --bg: var(--app);
+  --card: var(--surface);
+  --line: var(--hair-2);
+  --txt: var(--text);
+  --muted: var(--text-2);
+  --err: var(--danger);
+}
+
+/* Тема «AMOLED» — на будущее, без in-app переключателя.
+   Активируется добавлением класса .amoled на корень.
+.amoled {
+  --page: #000;
+  --app: #000;
+  --surface: #0b0e13;
+  --surface-2: #14181f;
+  --surface-3: #1d232c;
+  --hair: rgba(255, 255, 255, 0.09);
+  --hair-2: rgba(255, 255, 255, 0.16);
+}
+*/
+
+/* ============================================================
+   Базовый ресет + полноэкранный layout
+   ============================================================ */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--app);
+  color: var(--text);
+  font-family: var(--f-ui);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* безопасные зоны: контент не уезжает под чёлку/жест-бар */
+  padding:
+    env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* Корневой контейнер приложения — на весь экран реального телефона.
+   Рамка-устройство и скейл прототипа (.stage/.device/.device-fit)
+   намеренно НЕ переносятся — апп идёт fullscreen. */
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* клипуем — внутренний скролл несёт main (.content), шапка липнет */
+}
+
+/* ============================================================
+   Утилиты (из theme.css)
+   ============================================================ */
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.num {
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.tap {
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  /* iOS Safari: без этого тап по кнопке внутри вертикально-скроллируемого контейнера
+     (`<main class="content scroll">`) интермиттентно отменяется — касание трактуется
+     как возможный скролл, click не синтезируется. manipulation = «это тап-цель, не скролл»
+     (+ убирает 300ms-задержку). Чинит ✓/± внутри карточек на iOS. */
+  touch-action: manipulation;
+  transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s;
+}
+.tap:active { transform: scale(0.97); }
+
+.scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ============================================================
+   Статус-бар (имитация iOS) + home-indicator
+   ============================================================ */
+.statusbar {
+  height: 44px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px 0 28px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text);
+}
+.statusbar .sb-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+.home-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: 134px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* ============================================================
+   Карточки
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-card);
+  padding: 16px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+}
+
+/* ============================================================
+   Пилюли (вкладки дней, weekbtn, сегменты)
+   ============================================================ */
+.pill {
+  flex: 0 0 auto;
+  height: 42px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pill[data-active] {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+  box-shadow: 0 6px 18px var(--accent-tint);
+}
+
+/* ============================================================
+   Поля ввода (число подхода, RPE, большие поля)
+   ============================================================ */
+.field {
+  height: var(--tt);
+  border-radius: var(--r-field);
+  background: var(--surface-2);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 0 9px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.field .fv {
+  font-family: var(--f-num);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.field .fu {
+  font-size: 11px;
+  color: var(--text-3);
+  flex: 0 0 auto;
+}
+.field[data-plan] .fv {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.field[data-filled] { background: var(--surface-3); }
+.field:focus-within {
+  border-color: var(--accent);
+  background: var(--surface-3);
+  box-shadow: 0 0 0 4px var(--accent-tint);
+}
+
+.finput {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-family: var(--f-num);
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  -webkit-appearance: none;
+}
+.finput::placeholder {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.finput:disabled {
+  -webkit-text-fill-color: var(--text);
+  opacity: 1;
+}
+
+/* ============================================================
+   Кнопки-действия (CTA, галочка)
+   ============================================================ */
+.cta {
+  flex: 1 1 auto;
+  height: 58px;
+  border-radius: 17px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  font-family: var(--f-ui);
+  font-size: 18px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  box-shadow: 0 10px 26px var(--accent-tint);
+}
+.cta[data-disabled] {
+  background: var(--surface-2);
+  color: var(--text-3);
+  box-shadow: none;
+}
+
+.check {
+  height: var(--tt);
+  width: 100%;
+  border-radius: var(--r-field);
+  background: var(--surface-2);
+  border: 1.5px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+}
+.check[data-done] {
+  background: var(--ok);
+  border-color: transparent;
+  color: #04130a;
+  box-shadow: 0 6px 16px var(--ok-tint);
+}
+
+/* ============================================================
+   Шиты / боттомшиты (numpad / finish / settings)
+   ============================================================ */
+.sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 6, 10, 0.62);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sheet {
+  width: 100%;
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  border-top: 1px solid var(--hair-2);
+  box-shadow: var(--shadow-sheet);
+  padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.grab {
+  width: 42px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--hair-2);
+  align-self: center;
+  margin: 2px 0 4px;
+}
+.sheet-title {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.sheet-sub {
+  font-size: 14px;
+  color: var(--text-2);
+  margin-top: -10px;
+}
+
+/* ============================================================
+   Анимации (видимы в любом кадре — безопасны для неактивного фона)
+   ============================================================ */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
+
+/* ============================================================
+   ПЕРЕХОДНЫЕ стили текущих компонентов (ui/src/lib/*.svelte).
+   Сохранены, чтобы WIP-ветка не «разъехалась» до переработки
+   компонентов в следующих фазах. Перенаправлены на новые токены.
+   ============================================================ */
+header {
+  position: relative;
+  background: var(--app);
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+header h1 {
+  margin: 0;
+  font-size: 16px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+header select {
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  color: var(--text);
+  max-width: 46vw;
+}
+.gear {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  font-size: 18px;
+  padding: 6px 11px;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 10, 0.62);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  padding: 20px;
+}
+.overlay.on { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  padding: 18px;
+  width: 100%;
+  max-width: 380px;
+}
+.modal h3 { margin: 0 0 6px; font-size: 17px; }
+.modal label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-2);
+  margin: 14px 0 4px;
+}
+.modal input,
+.modal select {
+  width: 100%;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.modal .hint { font-size: 12px; color: var(--text-2); margin-top: 6px; }
+.modal .row { display: flex; gap: 10px; margin-top: 18px; }
+.modal .row button { flex: 1; padding: 13px; font-size: 15px; border: none; border-radius: 10px; }
+.modal .save { background: var(--accent); color: var(--on-accent); }
+.modal .cancel {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--hair);
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--hair);
+  background: var(--app);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tab.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tab:disabled { opacity: 0.45; }
+.status { font-size: 13px; padding: 8px 16px; }
+.s-idle { color: var(--text-2); }
+.s-sync { color: var(--accent); }
+.s-ok { color: var(--ok); }
+.s-err { color: var(--err); }
+.s-local { color: var(--warn); }
+.banner {
+  margin: 10px 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ok-tint);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.banner button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ok);
+  background: transparent;
+  color: var(--ok);
+  font-size: 13px;
+}
+.ex {
+  background: var(--surface);
+  margin: 12px;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid var(--hair);
+}
+.ex h2 { margin: 0 0 6px; font-size: 16px; }
+.ex .exnote { color: var(--warn); font-size: 12px; margin: 0 0 8px; white-space: pre-wrap; }
+.cfield { margin-top: 12px; }
+.cfield label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 5px; }
+.cfield input,
+.cfield select {
+  width: 100%;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cfield input:disabled,
+.cfield select:disabled { opacity: 0.55; }
+.lbls,
+.set {
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr 1.1fr 44px;
+  gap: 8px;
+  align-items: center;
+}
+.lbls { color: var(--text-2); font-size: 11px; margin-top: 6px; }
+.lbls div { text-align: center; }
+.set { margin-top: 8px; }
+.set.warm .idx { color: var(--warn); font-weight: 600; }
+.set .idx {
+  font-size: 13px;
+  text-align: center;
+  padding: 6px 0;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+.set input,
+.set select {
+  width: 100%;
+  font-size: 16px;
+  padding: 12px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: center;
+  -webkit-appearance: none;
+  appearance: none;
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+}
+.set input:focus,
+.set select:focus { outline: none; border-color: var(--accent); }
+.set input:disabled,
+.set select:disabled { opacity: 0.55; }
+.set .done {
+  height: 44px;
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--hair);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+.set .done.on { background: var(--ok); border-color: var(--ok); color: #06250f; }
+.set .idx:disabled,
+.set .done:disabled { opacity: 0.55; cursor: default; }
+.setnote { grid-column: 2 / 6; color: var(--text-2); font-size: 11px; margin-top: 2px; }
+.exbtns { margin-top: 10px; display: flex; gap: 8px; }
+.exbtns button {
+  flex: 1;
+  padding: 9px;
+  font-size: 13px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+}
+.exbtns button:disabled { opacity: 0.4; }
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--app);
+  border-top: 1px solid var(--hair);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  display: flex;
+  gap: 10px;
+}
+footer button {
+  flex: 1;
+  padding: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+footer button:disabled { background: var(--surface-2); color: var(--text-2); }
+footer button.retry { background: var(--warn); flex: 0 0 56px; }

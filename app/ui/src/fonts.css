@@ -1,0 +1,36 @@
+/* ============================================================
+   Шрифты (инлайн, без Google Fonts CDN) — Фаза 2 редизайна.
+   Только latin-subset (variable woff2), чтобы держать single-file
+   бандл компактным под лимит Apps Script HtmlService.
+
+   Важно: у Hanken/Space Grotesk на Google Fonts НЕТ основной
+   кириллицы (U+0410–044F) — только cyrillic-ext (исторические
+   символы). Поэтому:
+   - текст (--f-ui): Hanken рендерит латиницу/бренд, русский —
+     системный fallback внутри стека --f-ui;
+   - числа (--f-num): Space Grotesk покрывает 0-9 (latin), что и
+     нужно для весов/повторов/таймера с tabular-nums.
+
+   latin-ext / vietnamese / cyrillic-ext subset'ы НЕ подключаем
+   намеренно — экономия размера.
+   ============================================================ */
+
+/* Hanken Grotesk — текст/UI (вес 100–900, variable) */
+@font-face {
+  font-family: 'Hanken Grotesk Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(@fontsource-variable/hanken-grotesk/files/hanken-grotesk-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+/* Space Grotesk — числа/таймер (вес 300–700, variable) */
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url(@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}

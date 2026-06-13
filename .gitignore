@@ -1,0 +1,20 @@
+# Локальные секреты — не в публичном репо (см. app/.env.example)
+.env
+app/.env
+.clasp.json
+.clasprc.json
+*.bak
+node_modules/
+dist/
+test-results/
+playwright-report/
+# Приватные файлы проекта — в монорепе они симлинки на ../training-private/ (реальные файлы
+# приватные). В публичном репо их быть не должно.
+/PRIVATE.md
+/JOURNAL.md
+/train-plans/
+/.life/
+# Генерируемые артефакты Apps Script (собираются из *.ts)
+/app/index.html
+/app/logic.gs
+/app/server.gs

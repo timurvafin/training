@@ -1,0 +1,9 @@
+{
+  "//": "Typecheck тестов (vitest). Отдельно от tsconfig.json: server.test.ts тянет server.ts,",
+  "//2": "которому нужны Apps Script-глобалы (@types/google-apps-script) — в клиентский typecheck их не пускаем.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["google-apps-script"]
+  },
+  "include": ["src/**/*.test.ts", "tests/**/*.ts", "vitest.setup.ts"]
+}

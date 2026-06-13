@@ -1,0 +1,35 @@
+{
+  "name": "training-tracker-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "UI трекера тренировок (Svelte + Vite, single-file для Apps Script)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.gs.json",
+    "gen:gs": "node gen-gs.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:typecheck": "svelte-check --tsconfig ./tsconfig.test.json",
+    "e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@types/google-apps-script": "^2.0.9",
+    "esbuild": "^0.28.0",
+    "jsdom": "^29.1.1",
+    "svelte": "^5.56.2",
+    "svelte-check": "^4.6.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@fontsource-variable/hanken-grotesk": "^5.2.8",
+    "@fontsource-variable/space-grotesk": "^5.2.10"
+  }
+}

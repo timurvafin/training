@@ -1,0 +1,17 @@
+# clasp: .clasp.json содержит scriptId и parentId (= spreadsheet_id) — не коммитить в публичный репо
+.clasp.json
+.clasprc.json
+# .env — секреты (SPREADSHEET_ID и пр.), только локально, не в публичный репо
+.env
+*.bak
+node_modules/
+dist/
+# index.html в корне — сгенерированный сборкой Svelte/Vite артефакт (source — ui/src/).
+# Anchored (/), чтобы не задеть ui/index.html (Vite entry).
+/index.html
+# logic.gs / server.gs — генерируются из logic.ts / server.ts (ui/gen-gs.mjs) для Apps Script.
+/logic.gs
+/server.gs
+# Playwright e2e — артефакты прогона
+test-results/
+playwright-report/
