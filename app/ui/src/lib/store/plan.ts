@@ -87,7 +87,11 @@ function initAfterPlan(): void {
     return
   }
   clearTimer() // новая сессия — старый таймер не относится к ней
-  const week = weeks[weeks.length - 1] // по умолчанию последняя неделя
-  app.session = buildState(plan.days[0], week, planName())
+  // Восстанавливаем прошлый выбор недели/дня, если он валиден для текущего плана;
+  // иначе дефолты: последняя неделя / первый день.
+  const lastWeek = storage.getLastWeek()
+  const week = weeks.indexOf(lastWeek) >= 0 ? lastWeek : weeks[weeks.length - 1]
+  const day = findDay(plan, storage.getLastDay()) || plan.days[0]
+  app.session = buildState(day, week, planName())
   save()
 }

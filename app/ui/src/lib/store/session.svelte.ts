@@ -62,6 +62,7 @@ export function selectWeek(week: string): void {
   if (guardUnsynced()) return
   clearTimer() // смена недели — таймер прошлой сессии больше не релевантен
   app.session = buildState(findDay(app.plan, app.session.day_id) || app.plan.days[0], week, planName())
+  storage.setLastWeek(week) // запомнить выбор недели для следующего запуска
   save()
 }
 export function selectDay(dayId: string): void {
@@ -73,6 +74,7 @@ export function selectDay(dayId: string): void {
   if (guardUnsynced()) return
   clearTimer() // смена дня — таймер прошлого упражнения больше не релевантен
   app.session = buildState(day, app.session.week, planName())
+  storage.setLastDay(dayId) // запомнить выбор дня для следующего запуска
   save()
 }
 
