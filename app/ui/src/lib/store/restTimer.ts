@@ -9,9 +9,8 @@ import type { TimerView } from '../types.ts'
 
 let timerIv: ReturnType<typeof setInterval> | null = null // id интервала тика; null когда таймера нет
 
-function persistTimer(): void {
-  storage.saveTimer(timer.serialize(app.timer)) // null → удалит ключ
-}
+// Таймер не персистится (in-memory) — не переживает reload, как и сессия (черновики не храним). No-op.
+function persistTimer(): void {}
 
 // Тик включён, только пока app.timer != null. Идемпотентно: повторный вызов не плодит интервалы.
 function ensureTick(): void {
@@ -89,7 +88,7 @@ export function timerView(): TimerView {
   return timer.derive(app.timer, app.now)
 }
 
-// Тихий режим: вкл/выкл звук+вибрацию сигнала окончания отдыха (persist в localStorage).
+// Тихий режим: вкл/выкл звук+вибрацию сигнала окончания отдыха (persist в серверных prefs).
 export function toggleMute(): void {
   app.muted = !app.muted
   storage.setMuted(app.muted)
@@ -102,19 +101,6 @@ export function clearTimer(): void {
   app.timer = null
   ensureTick()
   persistTimer()
-}
-
-// Восстановить rest-таймер из localStorage: моменты те же, now актуальный → derive «доезжает».
-export function restoreTimer(): void {
-  const restored = timer.restore(storage.loadTimer())
-  app.now = Date.now()
-  app.timer = restored
-  ensureTick()
-  // settleFinished сразу, если за время оффлайна таймер уже перешёл в переотдых.
-  if (app.timer) {
-    const settled = timer.settleFinished(app.timer, app.now)
-    if (settled !== app.timer) { app.timer = settled; persistTimer() }
-  }
 }
 
 // Возврат вкладки из фона: setInterval в фоне тротлится — при показе пересчитываем now

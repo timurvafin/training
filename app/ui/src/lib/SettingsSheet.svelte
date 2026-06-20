@@ -1,6 +1,5 @@
 <script>
   import { app, saveSettings, planName, toggleMute } from './store.svelte.js'
-  import * as storage from './storage.js'
   import BottomSheet from './BottomSheet.svelte'
 
   // Список планов (имена). Фолбэк на текущий, если кэш планов пуст.
@@ -11,12 +10,10 @@
   const build = typeof __BUILD_INFO__ !== 'undefined' ? __BUILD_INFO__ : 'dev'
 
   let selPlan = $state(planName())
-  let secret = $state(storage.getSecret())
-  let reveal = $state(false)
 
   function close() { app.showSettings = false }
-  // Неделя выбирается в шапке (не здесь) — saveSettings принимает только секрет и план.
-  function save() { saveSettings(secret, selPlan) }
+  // Неделя — в шапке; секрет записи приходит с сервера автоматически. saveSettings меняет только план.
+  function save() { saveSettings(selPlan) }
 </script>
 
 <BottomSheet testid="settings-sheet" labelledby="settings-sheet-title" onClose={close}>
@@ -36,36 +33,6 @@
       <span class="chev" aria-hidden="true">▾</span>
     </div>
     <div class="set-meta">Список тренировок и план берётся из выбранной вкладки таблицы.</div>
-  </div>
-
-  <div class="frow">
-    <div class="flabel">Секрет записи</div>
-    <div class="set-field">
-      {#if reveal}
-        <input
-          class="set-input"
-          type="text"
-          aria-label="секрет записи"
-          placeholder="пусто = без секрета"
-          bind:value={secret}
-        />
-      {:else}
-        <input
-          class="set-input"
-          type="password"
-          aria-label="секрет записи"
-          placeholder="••••••••••"
-          bind:value={secret}
-        />
-      {/if}
-      <button
-        type="button"
-        class="reveal tap"
-        aria-label={reveal ? 'скрыть секрет' : 'показать секрет'}
-        onclick={() => (reveal = !reveal)}
-      >{reveal ? 'скрыть' : 'показать'}</button>
-    </div>
-    <div class="set-meta">Нужен, чтобы приложение могло писать факт обратно в таблицу.</div>
   </div>
 
   <div class="frow">
@@ -130,9 +97,8 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 4px var(--accent-tint);
   }
-  /* Нативный select/input «вписан» в .set-field, без собственного фона/рамки. */
-  .set-select,
-  .set-input {
+  /* Нативный select «вписан» в .set-field, без собственного фона/рамки. */
+  .set-select {
     flex: 1 1 auto;
     min-width: 0;
     height: 100%;
@@ -147,25 +113,10 @@
     -webkit-appearance: none;
     appearance: none;
   }
-  .set-input::placeholder {
-    color: var(--text-3);
-    letter-spacing: 4px;
-  }
   .set-field .chev {
     margin-left: auto;
     color: var(--text-3);
     pointer-events: none;
-  }
-  .set-field .reveal {
-    margin-left: auto;
-    flex: 0 0 auto;
-    background: none;
-    border: none;
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0;
-    padding: 0;
   }
   .set-field.static .src-name { color: var(--text); }
   .set-field .conn {

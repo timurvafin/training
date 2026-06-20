@@ -7,6 +7,8 @@ import * as api from '../api.js'
 import { buildPayload } from '../state.js'
 import { save, flushSave } from './persist.svelte.js'
 import { settleOnVisible } from './restTimer.js'
+import { flushPrefs } from './prefs.js'
+import { refreshProgress } from './progress.js'
 import type { SessionPayload, CardioPayload, SyncState } from '../types.ts'
 
 export async function syncNow(): Promise<void> {
@@ -40,12 +42,15 @@ export async function syncNow(): Promise<void> {
       app.showRetry = true
     }
     save() // persist терминального результата (synced и/или _submitting=false)
+    // Отметить день выполненным в факте, чтобы повторный заход не дал editable-форму и дубль.
+    if (res && res.ok && app.session) await refreshProgress(app.session.week)
   } catch (err) {
     if (!app.session || app.session.session_id !== sid) return
     app.session._submitting = false
     app.session.finalizing = false // снять лок, чтобы не застрять (вкл. таймаут зависшего запроса)
     save()
-    setStatus('s-local', 'Ошибка сети — сохранено локально. Нажми ↻: ' + ((err as Error)?.message || err))
+    // Честно: офлайн-черновик НЕ персистится (localStorage убран) — держи вкладку открытой и жми ↻.
+    setStatus('s-local', 'Нет сети — не закрывай вкладку, нажми ↻: ' + ((err as Error)?.message || err))
     app.showRetry = true
   }
 }
@@ -59,14 +64,14 @@ export function initOnlineListener(): () => void {
   }
   // Возврат вкладки из фона: setInterval в фоне тротлится — при показе пересчитываем now
   // и сразу закрепляем переотдых, чтобы таймер «доехал» без задержки до ближайшего тика.
-  // Уход вкладки в фон (hidden) — момент надёжно сбросить отложенную localStorage-запись.
+  // Уход вкладки в фон (hidden) — момент дослать отложенный prefs-push на сервер (flushPrefs).
   const onVisibility = () => {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flushSave()
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') { flushSave(); flushPrefs() }
     if (typeof document === 'undefined' || document.visibilityState !== 'visible') return
     settleOnVisible()
   }
   // pagehide — последний надёжный момент перед выгрузкой/bfcache: дописать отложенный снапшот.
-  const onPageHide = () => flushSave()
+  const onPageHide = () => { flushSave(); flushPrefs() }
 
   const hasWindow = typeof window !== 'undefined'
   const hasDocument = typeof document !== 'undefined'

@@ -1,7 +1,7 @@
 // Чистые трансформы состояния сессии. collectSets — из канонического logic.ts
 // (app/logic.ts — единый источник; серверный logic.gs генерируется из него); зеркало удалено.
 import { collectSets } from '../../../logic.ts'
-import type { Plan, PlanDay, PlanExercise, PlanSet, Cell, Session, SessionExercise, SessionSet, FrozenPayload } from './types.ts'
+import type { Plan, PlanDay, PlanExercise, PlanSet, Cell, Session, SessionExercise, SessionSet, FrozenPayload, ProgressDay } from './types.ts'
 
 export { collectSets }
 
@@ -60,6 +60,39 @@ export function buildState(day: PlanDay, week: string, planNm: string): Session 
       }))
       .filter((ex) => ex.sets.length),
   }
+}
+
+// Построить READ-ONLY сессию из факта (progress) — просмотр выполненного дня.
+// synced=true → isLocked() → весь UI заблокирован (инпуты disabled, «Завершить» скрыт). day — из плана (для имени/кардио-заметки).
+export function buildStateFromProgress(day: PlanDay, week: string, planNm: string, prog: ProgressDay): Session {
+  const base = {
+    session_id: prog.session_id || uuid(), plan: planNm, week, day_id: day.day_id, day_name: day.day_name,
+    date: prog.date || todayLocal(), status: prog.status || 'completed',
+    synced: true, finalizing: false, payload: null as FrozenPayload | null, _submitting: false, _dirty: false,
+  }
+  if (prog.cardio || isCardio(day)) {
+    const cex = (day.exercises[0] || {}) as Partial<PlanExercise>
+    return {
+      ...base, cardio: true, cardio_name: cex.name || 'Кардио', cardio_note: cex.note || '',
+      type: prog.type || '', duration: prog.duration || '', hr: prog.hr || '', rpe: prog.rpe || '', exercises: [],
+    }
+  }
+  // Силовая: группируем факт по упражнению (в порядке появления); note берём из плана, если есть.
+  const noteByName: Record<string, string> = {}
+  ;(day.exercises || []).forEach((ex) => { noteByName[ex.name] = ex.note || '' })
+  const exMap: Record<string, SessionExercise> = {}
+  const order: string[] = []
+  ;(prog.sets || []).forEach((s) => {
+    if (!exMap[s.exercise]) {
+      exMap[s.exercise] = { exercise_id: s.exercise, name: s.exercise, note: noteByName[s.exercise] || '', sets: [] }
+      order.push(s.exercise)
+    }
+    exMap[s.exercise].sets.push({
+      reps: s.reps || '', weight: s.weight || '', rpe: s.rpe || '', is_warmup: !!s.is_warmup,
+      done: true, target_reps: '', note: s.note || '',
+    })
+  })
+  return { ...base, cardio: false, feel: prog.feel || '', exercises: order.map((n) => exMap[n]) }
 }
 
 // Заморозить снимок для отправки. Кардио → лист «Кардио», иначе → «Сессии».

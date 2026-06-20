@@ -11,6 +11,11 @@ export type {
   CardioPayload,
   ValidationResult,
   SaveResult,
+  Prefs,
+  ProgressSet,
+  ProgressDay,
+  ProgressMap,
+  BootstrapResult,
 } from '../../../logic.ts'
 
 import type { SessionPayload, CardioPayload } from '../../../logic.ts'
@@ -125,6 +130,8 @@ export type SyncState = 'idle' | 'sync' | 'ok' | 'off'
 export interface AppState {
   plans: string[]
   plan: import('../../../logic.ts').Plan | null
+  // Факт выполненных дней текущей недели (read-only просмотр). null — ещё не загружен.
+  progress: import('../../../logic.ts').ProgressMap | null
   session: Session | null
   status: Status
   showRetry: boolean
@@ -134,4 +141,5 @@ export interface AppState {
   now: number
   loading: LoadingState
   muted: boolean
+  weekLoading: boolean // идёт загрузка факта недели (смена недели) — лёгкий оверлей на контенте
 }

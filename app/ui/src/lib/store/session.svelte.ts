@@ -6,6 +6,7 @@ import { buildState, buildPayload, findDay, collectSets, DEFAULT_REST } from '..
 import { startRestTimer, clearTimer } from './restTimer.js'
 import { syncNow } from './sync.js'
 import { save, flushSave, touch, planName } from './persist.svelte.js'
+import { buildForDay, refreshProgress } from './progress.js'
 import type { SessionExercise, SessionSet } from '../types.ts'
 
 // ——— подходы ———
@@ -56,14 +57,27 @@ function guardUnsynced(): boolean {
 // (synced/finalizing): завершённый день уже отправлен на сервер, а переход на другой
 // день/неделю — это начало отдельной сессии (она не залочена). От потери прогресса
 // защищает guardUnsynced(): при synced терять нечего, подтверждение не всплывает.
-export function selectWeek(week: string): void {
+export async function selectWeek(week: string): Promise<void> {
   if (!app.session || !app.plan) return
   if (week === app.session.week) return // та же неделя — не пересобираем (сохраняем locked-вид)
   if (guardUnsynced()) return
-  clearTimer() // смена недели — таймер прошлой сессии больше не релевантен
-  app.session = buildState(findDay(app.plan, app.session.day_id) || app.plan.days[0], week, planName())
-  storage.setLastWeek(week) // запомнить выбор недели для следующего запуска
-  save()
+  const dayId = app.session.day_id
+  const day = findDay(app.plan, dayId) || app.plan.days[0]
+  // Блокирующе грузим факт ДО показа дня — иначе выполненный день мелькнёт editable (риск дубля).
+  // Лёгкий оверлей на контенте, пока ждём факт (round-trip ~1с).
+  setStatus('s-sync', 'Загрузка недели…')
+  app.weekLoading = true
+  try {
+    const ok = await refreshProgress(week)
+    if (!ok) { setStatus('s-err', 'Нет сети — неделя не переключена'); return }
+    clearTimer() // переключаемся — таймер прошлой сессии больше не релевантен
+    storage.setLastWeek(week) // запомнить выбор недели для следующего запуска
+    app.session = buildForDay(day, week) // read-only, если день этой недели выполнен
+    save()
+    setStatus('s-idle', 'Неделя «' + week + '»')
+  } finally {
+    app.weekLoading = false
+  }
 }
 export function selectDay(dayId: string): void {
   if (!app.session || !app.plan) return
@@ -73,8 +87,8 @@ export function selectDay(dayId: string): void {
   if (!day) return
   if (guardUnsynced()) return
   clearTimer() // смена дня — таймер прошлого упражнения больше не релевантен
-  app.session = buildState(day, app.session.week, planName())
   storage.setLastDay(dayId) // запомнить выбор дня для следующего запуска
+  app.session = buildForDay(day, app.session.week) // выполненный день → read-only факт
   save()
 }
 

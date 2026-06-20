@@ -9,14 +9,13 @@ import { planName } from './persist.svelte.js'
 import { fetchPlan } from './plan.js'
 import { runLoading, LOAD_RELOAD } from './loading.js'
 
-export function saveSettings(newSecret: string, newPlan?: string): void {
+export function saveSettings(newPlan?: string): void {
   const changingPlan = newPlan && newPlan !== planName()
-  // confirm — ДО любых side-effects (секрет/модалка/plan_name).
+  // confirm — ДО любых side-effects (модалка/plan_name). Секрет записи теперь серверный, тут не трогаем.
   if (changingPlan && app.session && !app.session.synced && (app.session._dirty || app.session.payload) &&
       !confirm('Сменить план «' + planName() + '» → «' + newPlan + '»? Несохранённый прогресс будет потерян.')) {
     return
   }
-  storage.setSecret(newSecret)
   app.showSettings = false
   if (changingPlan) {
     if (api.isAppsScript()) {

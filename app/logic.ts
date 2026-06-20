@@ -26,6 +26,50 @@ export type ValidationResult = { ok: true } | ValidationError
 // Единый источник для сервера (server.ts) и клиента (ui/types.ts реэкспортит) — не дублировать.
 export type SaveResult = { ok: true; written: number; duplicate?: boolean } | ValidationError
 
+// Серверные настройки выбора (план/неделя/день/звук) — переживают перезапуск (localStorage ломается в iframe на iOS).
+// `secret` — серверный SHARED_SECRET, отдаётся клиенту для payload (на сервере хранится отдельно, через setPrefs не пишется).
+export interface Prefs {
+  plan_name?: string
+  last_week?: string
+  last_day?: string
+  muted?: boolean
+  secret?: string
+}
+
+// Факт по выполненному дню (read-only просмотр) — derive из «Сессии»/«Кардио».
+export interface ProgressSet {
+  exercise: string
+  set_index: number | string
+  is_warmup: boolean
+  reps: string
+  weight: string
+  rpe: string
+  note: string
+}
+export interface ProgressDay {
+  sets: ProgressSet[]
+  status: string
+  feel: string
+  date: string
+  session_id: string
+  // Кардио-день (из листа «Кардио») — sets пуст, факт в полях ниже.
+  cardio?: boolean
+  type?: string
+  duration?: string
+  hr?: string
+  rpe?: string
+  note?: string
+}
+export type ProgressMap = Record<string, ProgressDay>
+
+// Ответ единого стартового вызова bootstrap() — за один round-trip Apps Script.
+export interface BootstrapResult {
+  plans: string[]
+  prefs: Prefs
+  plan: Plan
+  progress?: ProgressMap | null
+}
+
 export interface PlanSet {
   is_warmup: boolean
   rest?: number
@@ -303,6 +347,101 @@ export function validateCardioPayload(p: CardioPayload | null | undefined): Vali
   if (p.hr !== '' && p.hr != null) { const h = Number(p.hr); if (!(h > 0 && h < 300)) return { ok: false, code: 'bad_hr', error: 'Пульс вне диапазона' } }
   if (p.rpe !== '' && p.rpe != null) { const r = Number(p.rpe); if (!(r >= 1 && r <= 10)) return { ok: false, code: 'bad_rpe', error: 'RPE вне 1–10' } }
   return { ok: true }
+}
+
+// === Прогресс (read-only факт выполненных дней) — чистая группировка из values листов ===
+
+// Ключ сортировки записей «по времени»: ISO saved_at → epoch; Date-объект из Sheets → getTime;
+// нечисловое/пустое → номер строки (поздние строки = позже). Защита от строкового сравнения не-ISO.
+function savedAtKey(v: unknown, rowIdx: number): number {
+  if (v instanceof Date) return v.getTime()
+  const t = Date.parse(String(v == null ? '' : v))
+  return Number.isFinite(t) ? t : rowIdx
+}
+
+// Факт из «Сессии» по дням. Колонки (DATA-CONTRACT.md / buildSessionRows):
+// 0 session_id | 1 plan | 2 week | 3 date | 4 day | 5 name | 6 set_index | 7 is_warmup | 8 reps | 9 weight | 10 rpe | 11 note | 12 status | 13 feel | 14 saved_at.
+// Несколько сессий на один день → берём последнюю по saved_at (колонка 14). Сравнение plan/week — строковое c trim.
+export function parseSessionProgress(values: unknown[][], planName: string, week: string): ProgressMap {
+  const out: ProgressMap = {}
+  if (!values || values.length < 2) return out
+  const pn = String(planName ?? '').trim()
+  const wk = String(week ?? '').trim()
+  const byDay: Record<string, Record<string, { rows: unknown[][]; savedAt: number }>> = {}
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r]
+    if (!row) continue
+    if (String(row[1] ?? '').trim() !== pn || String(row[2] ?? '').trim() !== wk) continue
+    const day = String(row[4] ?? '').trim()
+    if (!day) continue
+    const sid = String(row[0] ?? '')
+    if (!byDay[day]) byDay[day] = {}
+    if (!byDay[day][sid]) byDay[day][sid] = { rows: [], savedAt: -Infinity }
+    byDay[day][sid].rows.push(row)
+    const sa = savedAtKey(row[14], r)
+    if (sa > byDay[day][sid].savedAt) byDay[day][sid].savedAt = sa
+  }
+  Object.keys(byDay).forEach((day) => {
+    const sessions = byDay[day]
+    let bestSid = ''
+    let bestSavedAt = -Infinity
+    Object.keys(sessions).forEach((sid) => {
+      if (bestSid === '' || sessions[sid].savedAt > bestSavedAt) { bestSid = sid; bestSavedAt = sessions[sid].savedAt }
+    })
+    const rows = sessions[bestSid].rows
+    const sets: ProgressSet[] = rows.map((row) => ({
+      exercise: String(row[5] ?? ''), set_index: (row[6] as number | string) ?? '',
+      is_warmup: truthyFlag(row[7]), reps: String(row[8] ?? ''), weight: String(row[9] ?? ''),
+      rpe: String(row[10] ?? ''), note: String(row[11] ?? ''),
+    }))
+    const first = rows[0]
+    out[day] = {
+      sets, status: String(first[12] ?? ''), feel: String(first[13] ?? ''),
+      date: String(first[3] ?? ''), session_id: bestSid, cardio: false,
+    }
+  })
+  return out
+}
+
+// Факт из «Кардио» по дням (одна строка на тренировку). Колонки (buildCardioRow):
+// 0 session_id | 1 plan | 2 week | 3 date | 4 day | 5 type | 6 duration | 7 hr | 8 rpe | 9 note | 10 saved_at.
+// Несколько записей на день → последняя по saved_at (колонка 10).
+export function parseCardioProgress(values: unknown[][], planName: string, week: string): ProgressMap {
+  const out: ProgressMap = {}
+  if (!values || values.length < 2) return out
+  const pn = String(planName ?? '').trim()
+  const wk = String(week ?? '').trim()
+  const byDay: Record<string, { savedAt: number; row: unknown[] }> = {}
+  for (let r = 1; r < values.length; r++) {
+    const row = values[r]
+    if (!row) continue
+    if (String(row[1] ?? '').trim() !== pn || String(row[2] ?? '').trim() !== wk) continue
+    const day = String(row[4] ?? '').trim()
+    if (!day) continue
+    const sa = savedAtKey(row[10], r)
+    if (!byDay[day] || sa > byDay[day].savedAt) byDay[day] = { savedAt: sa, row }
+  }
+  Object.keys(byDay).forEach((day) => {
+    const row = byDay[day].row
+    out[day] = {
+      sets: [], status: 'completed', feel: '', date: String(row[3] ?? ''), session_id: String(row[0] ?? ''),
+      cardio: true, type: String(row[5] ?? ''), duration: String(row[6] ?? ''),
+      hr: String(row[7] ?? ''), rpe: String(row[8] ?? ''), note: String(row[9] ?? ''),
+    }
+  })
+  return out
+}
+
+// Whitelist + лимиты длины для блоба PREFS. Клиент шлёт полный снимок — берём только известные ключи,
+// `secret` НЕ включаем (серверный SHARED_SECRET, через setPrefs не перезаписывается). Возврат — чистый объект для перезаписи.
+export function sanitizePrefs(full: Prefs | null | undefined): Prefs {
+  const src = full && typeof full === 'object' ? full : {}
+  const out: Prefs = {}
+  if (src.plan_name != null) out.plan_name = String(src.plan_name).slice(0, 100)
+  if (src.last_week != null) out.last_week = String(src.last_week).slice(0, 100)
+  if (src.last_day != null) out.last_day = String(src.last_day).slice(0, 100)
+  if (src.muted != null) out.muted = !!src.muted
+  return out
 }
 
 // → 1 строка для листа «Кардио» (порядок колонок = DATA-CONTRACT.md).

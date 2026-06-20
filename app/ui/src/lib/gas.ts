@@ -39,6 +39,10 @@ export function gas<T = unknown>(method: string, ...args: unknown[]): Promise<T>
 function mockOffline(): boolean {
   try { return g.localStorage?.getItem('mock_offline') === '1' } catch (e) { return false }
 }
+// e2e-фикстура факта выполненных дней (для bootstrap/getProgress). По умолчанию пусто.
+function mockProgress(): unknown {
+  try { return JSON.parse(g.localStorage?.getItem('mock_progress') || '{}') } catch (e) { return {} }
+}
 function mockDelay(): number {
   try { return Number(g.localStorage?.getItem('mock_delay')) || 0 } catch (e) { return 0 }
 }
@@ -51,6 +55,10 @@ export function isAppsScript(): boolean {
 function mock(method: string): unknown {
   if (method === 'listPlans') return ['fullbody', 'Восстановление']
   if (method === 'getPlan') return MOCK_PLAN
+  if (method === 'bootstrap') return { plans: ['fullbody', 'Восстановление'], prefs: {}, plan: MOCK_PLAN, progress: mockProgress() }
+  if (method === 'getPrefs') return {}
+  if (method === 'setPrefs') return { ok: true }
+  if (method === 'getProgress') return mockProgress()
   // saveSession / saveCardio — имитируем успешную запись
   if (method === 'saveSession' || method === 'saveCardio') return { ok: true, written: 1, mock: true }
   return { ok: true, mock: true }

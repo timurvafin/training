@@ -9,11 +9,10 @@ import { test as base, expect, type Page, type Locator } from '@playwright/test'
 // на грудь») и «Кардио 1»; недели «Неделя 1»/«Неделя 2» (по умолчанию последняя — «Неделя 2»).
 // ──────────────────────────────────────────────────────────────────────────
 
-// ИЗОЛЯЦИЯ: перед каждым тестом чистим localStorage (там копится session_state /
-// rest_timer / mock_offline / plan_name), чтобы тесты не влияли друг на друга.
+// ИЗОЛЯЦИЯ: перед каждым тестом чистим localStorage (там — только dev-mock переключатели
+// mock_offline / mock_delay / mock_progress; рантайм-персиста в localStorage больше нет).
 // addInitScript выполняется до загрузки приложения на КАЖДОЙ навигации (в т.ч. reload),
-// поэтому чистим только ОДИН раз за тест — через sessionStorage-маркер. Каждый тест
-// получает свежий context (пустой sessionStorage), а reload-сценарии не теряют session_state.
+// поэтому чистим только ОДИН раз за тест — через sessionStorage-маркер.
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addInitScript(() => {

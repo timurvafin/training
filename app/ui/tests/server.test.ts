@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { saveSession, saveCardio } from '../../server.ts'
+import { saveSession, saveCardio, getPrefs, setPrefs } from '../../server.ts'
+import { parseSessionProgress } from '../../logic.ts'
 import type { SessionPayload, CardioPayload } from '../../logic.ts'
 
 // Юнит-тесты идемпотентного append (saveRowsIdempotent через saveSession/saveCardio). Все Apps Script-глобалы
@@ -119,5 +120,68 @@ describe('saveCardio', () => {
   it('валидация: пустая длительность → no_duration', () => {
     mockGas({ secret: 'topsecret' })
     expect(saveCardio(validCardio({ duration: '' }))).toMatchObject({ ok: false, code: 'no_duration' })
+  })
+})
+
+// Серверные prefs: ScriptProperties с реальным get/set в объекте. Глобальный afterEach чистит PropertiesService.
+function mockProps(initial: Record<string, string> = {}) {
+  const store: Record<string, string> = { ...initial }
+  const g = globalThis as Record<string, unknown>
+  g.PropertiesService = {
+    getScriptProperties: () => ({
+      getProperty: (k: string) => (k in store ? store[k] : null),
+      setProperty: (k: string, v: string) => { store[k] = v },
+    }),
+  }
+  return store
+}
+
+describe('prefs (getPrefs/setPrefs)', () => {
+  it('setPrefs полным снимком → getPrefs возвращает их + secret из SHARED_SECRET', () => {
+    mockProps({ SHARED_SECRET: 'topsecret' })
+    setPrefs({ plan_name: 'fullbody', last_week: 'Неделя 2', last_day: 'День 1', muted: true })
+    const p = getPrefs()
+    expect(p.plan_name).toBe('fullbody')
+    expect(p.last_week).toBe('Неделя 2')
+    expect(p.last_day).toBe('День 1')
+    expect(p.muted).toBe(true)
+    expect(p.secret).toBe('topsecret') // секрет — серверный SHARED_SECRET, не из снапшота
+  })
+
+  it('whitelist: посторонние ключи и secret в PREFS не пишутся, SHARED_SECRET не трогается', () => {
+    const store = mockProps()
+    setPrefs({ plan_name: 'X', secret: 'hack', evil: 'y' } as unknown as Parameters<typeof setPrefs>[0])
+    expect(JSON.parse(store.PREFS)).toEqual({ plan_name: 'X' })
+    expect(store.SHARED_SECRET).toBeUndefined()
+  })
+
+  it('пустой PREFS → getPrefs не падает, secret пустой если SHARED_SECRET не задан', () => {
+    mockProps()
+    expect(getPrefs()).toEqual({ secret: '' })
+  })
+})
+
+describe('parseSessionProgress (read-only факт)', () => {
+  const H = ['session_id', 'plan', 'week', 'date', 'day', 'name', 'set_index', 'is_warmup', 'reps', 'weight', 'rpe', 'note', 'status', 'feel', 'saved_at']
+  it('несколько сессий на день → берётся последняя по saved_at', () => {
+    const values = [
+      H,
+      ['s1', 'fullbody', 'Неделя 1', '2026-06-01', 'День 1', 'Жим', '1', '', '10', '100', '8', '', 'completed', '7', '2026-06-01T10:00:00Z'],
+      ['s2', 'fullbody', 'Неделя 1', '2026-06-03', 'День 1', 'Жим', '1', '', '12', '110', '9', '', 'completed', '8', '2026-06-03T10:00:00Z'],
+    ]
+    const m = parseSessionProgress(values, 'fullbody', 'Неделя 1')
+    expect(m['День 1'].session_id).toBe('s2')
+    expect(m['День 1'].sets[0].weight).toBe('110')
+    expect(m['День 1'].feel).toBe('8')
+  })
+
+  it('фильтр по плану/неделе с trim; чужие строки игнорируются', () => {
+    const values = [
+      H,
+      ['s1', ' fullbody ', ' Неделя 1 ', '2026-06-01', 'День 1', 'Жим', '1', '', '10', '100', '', '', 'completed', '', 't1'],
+      ['s2', 'other', 'Неделя 1', '2026-06-01', 'День 2', 'Тяга', '1', '', '8', '50', '', '', 'completed', '', 't2'],
+    ]
+    const m = parseSessionProgress(values, 'fullbody', 'Неделя 1')
+    expect(Object.keys(m)).toEqual(['День 1'])
   })
 })

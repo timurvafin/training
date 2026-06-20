@@ -22,6 +22,7 @@
 
   const locked = $derived(isLocked())
   const empty = $derived(!!(app.session && !app.session.cardio && !app.session.exercises.length))
+  const weekLoading = $derived(app.weekLoading)
 </script>
 
 <!-- Залипшая шапка: заголовок дня + кнопки (Завершить/Настройки) + вкладки дней + статус.
@@ -33,7 +34,7 @@
   <Banner />
 </div>
 
-<main class="content scroll">
+<main class="content scroll" aria-busy={weekLoading}>
   {#if app.session && app.session.cardio}
     <CardioForm {locked} />
   {:else if empty}
@@ -47,6 +48,9 @@
 
 {#if app.timer}<RestTimer />{/if}
 
+{#if weekLoading}
+  <div class="week-overlay" data-testid="week-loading" role="status" aria-live="polite"><div class="ring"></div></div>
+{/if}
 <LoadingScreen />
 {#if app.showFinish}<FinishSheet />{/if}
 {#if app.showSettings}<SettingsSheet />{/if}
@@ -66,4 +70,32 @@
     gap: 12px;
     padding: 4px 18px calc(18px + env(safe-area-inset-bottom));
   }
+  /* Оверлей загрузки факта при смене недели: fixed (скролл не влияет) + блокирует ввод —
+     пока грузим, нельзя кликнуть другую неделю/день, поэтому гонок переключений нет. Спиннер по центру. */
+  .week-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .week-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--app);
+    opacity: 0.6;
+  }
+  .week-overlay .ring {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 4px solid var(--hair-2);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .week-overlay .ring { animation: none; } }
 </style>

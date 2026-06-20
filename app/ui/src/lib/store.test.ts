@@ -127,7 +127,7 @@ describe('guard смены дня/недели', () => {
     const app = await strengthSession()
     const otherWeek = app.plan!.weeks.find((w) => w !== app.session!.week)!
     confirmFn.mockReturnValue(true)
-    store.selectWeek(otherWeek)
+    await store.selectWeek(otherWeek) // теперь async: блокирующе грузит факт недели
     expect(app.session!.week).toBe(otherWeek)
   })
 })
@@ -167,14 +167,19 @@ describe('syncStatus (derived)', () => {
   })
 })
 
-describe('localStorage недоступен', () => {
-  it('сбой записи снапшота → статус s-err, без падения', async () => {
-    const app = await strengthSession()
-    const spy = vi.spyOn(globalThis.localStorage, 'setItem').mockImplementation(() => {
-      throw new Error('quota exceeded')
-    })
-    store.addSet(app.session!.exercises[0]) // структурное действие → flushSave → writeSession
-    expect(app.status.cls).toBe('s-err')
-    spy.mockRestore()
+describe('старт через bootstrap (один серверный вызов)', () => {
+  it('loadPlan зовёт bootstrap один раз, без отдельных listPlans/getPlan', async () => {
+    const api = await import('./api.js')
+    const bootSpy = vi.spyOn(api, 'bootstrap')
+    const listSpy = vi.spyOn(api, 'listPlans')
+    const planSpy = vi.spyOn(api, 'getPlan')
+    vi.useFakeTimers()
+    const p = store.loadPlan()
+    await vi.runAllTimersAsync()
+    await p
+    vi.useRealTimers()
+    expect(bootSpy).toHaveBeenCalledTimes(1)
+    expect(listSpy).not.toHaveBeenCalled()
+    expect(planSpy).not.toHaveBeenCalled()
   })
 })

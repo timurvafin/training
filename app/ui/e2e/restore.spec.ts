@@ -1,72 +1,29 @@
-import {
-  test,
-  expect,
-  open,
-  enableOffline,
-  finishStrength,
-  expectActiveDay,
-  syncLine,
-  finishBtn,
-  setRows,
-  repsInput,
-  startRestTimer,
-} from './helpers'
+import { test, expect, open, finishBtn, setRows, repsInput, dayTab } from './helpers'
 
-// Восстановление после reload. Init-script чистит localStorage только ОДИН раз за тест
-// (sessionStorage-маркер), поэтому session_state / rest_timer переживают reload.
+// Read-only просмотр выполненного дня. Источник правды — факт на сервере (вкладки «Сессии»/«Кардио»),
+// здесь мокается через localStorage.mock_progress (dev-mock в gas.ts; bootstrap/getProgress читают его).
+// Черновики/таймер НЕ персистятся между reload — соответствующие старые кейсы удалены.
 
-test('введённый прогресс переживает reload', async ({ page }) => {
+test('выполненный день — read-only из факта (инпуты disabled, ✓ в табе)', async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('mock_progress', JSON.stringify({
+        'День 1': {
+          sets: [{ exercise: 'Жим ногами', set_index: 1, is_warmup: false, reps: '10', weight: '120', rpe: '8', note: '' }],
+          status: 'completed', feel: '7', date: '2026-06-10', session_id: 's1', cardio: false,
+        },
+      }))
+    } catch (e) { /* noop */ }
+  })
   await open(page)
-  await repsInput(setRows(page).nth(1)).fill('11')
-  // дождёмся, что значение записалось в стор (touch → save)
-  await expect(repsInput(setRows(page).nth(1))).toHaveValue('11')
-
-  await page.reload()
-  await expectActiveDay(page, 'День 1')
-  // Прогресс восстановлен.
-  await expect(repsInput(setRows(page).nth(1))).toHaveValue('11')
+  const reps = repsInput(setRows(page).nth(0))
+  await expect(reps).toHaveValue('10') // факт показан
+  await expect(reps).toBeDisabled() // read-only
+  await expect(finishBtn(page)).toBeDisabled() // «Завершить» недоступно
+  await expect(dayTab(page, 'День 1')).toHaveAttribute('data-done', '') // ✓-индикатор в табе
 })
 
-test('synced-сессия после reload остаётся locked', async ({ page }) => {
+test('невыполненный день — обычная форма ввода (инпут активен)', async ({ page }) => {
   await open(page)
-  await repsInput(setRows(page).nth(1)).fill('10')
-  await finishStrength(page, 7)
-  await expect(syncLine(page)).toHaveAttribute('data-s', 'ok')
-
-  await page.reload()
-  await expectActiveDay(page, 'День 1')
-  // Всё ещё залочено после reload.
-  await expect(syncLine(page)).toHaveAttribute('data-s', 'ok')
-  await expect(syncLine(page)).toContainText('Отправлено в таблицу')
-  await expect(finishBtn(page)).toBeDisabled()
-  await expect(repsInput(setRows(page).nth(1))).toBeDisabled()
-  await expect(page.locator('.banner')).toContainText('завершена')
-})
-
-test('failed-offline payload → после reload виден ретрай', async ({ page }) => {
-  await enableOffline(page)
-  await open(page)
-  await repsInput(setRows(page).nth(1)).fill('10')
-  // Финиш в offline — mock отклоняет saveSession → состояние «off» + ретрай.
-  await finishStrength(page, 7)
-  await expect(syncLine(page)).toHaveAttribute('data-s', 'off')
-  await expect(syncLine(page).getByRole('button', { name: 'Повторить отправку' })).toBeVisible()
-
-  // Reload (всё ещё offline) → есть несинхронизированный payload → ретрай снова виден.
-  await page.reload()
-  await expectActiveDay(page, 'День 1')
-  await expect(syncLine(page)).toHaveAttribute('data-s', 'off')
-  await expect(syncLine(page).getByRole('button', { name: 'Повторить отправку' })).toBeVisible()
-})
-
-test('rest-таймер переживает reload', async ({ page }) => {
-  await open(page)
-  // Старт rest-таймера ✓ рабочего подхода (тап по # теперь переключает тип, не стартует таймер).
-  await startRestTimer(setRows(page).nth(1))
-  await expect(page.locator('[data-testid="rest-timer"]')).toBeVisible()
-
-  await page.reload()
-  await expectActiveDay(page, 'День 1')
-  // Таймер восстановлен (моменты те же, доезжает по реальным часам).
-  await expect(page.locator('[data-testid="rest-timer"]')).toBeVisible()
+  await expect(repsInput(setRows(page).nth(0))).toBeEnabled()
 })

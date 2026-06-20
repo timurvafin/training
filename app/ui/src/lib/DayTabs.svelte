@@ -1,5 +1,5 @@
 <script>
-  import { app, selectDay } from './store.svelte.js'
+  import { app, selectDay, dayDone } from './store.svelte.js'
   import { isCardio } from './state.js'
 
   // Вкладки дней всегда кликабельны: даже когда текущий день завершён (locked),
@@ -11,11 +11,13 @@
   {#each app.plan?.days ?? [] as day (day.day_id)}
     {@const active = day.day_id === activeId}
     {@const cardio = isCardio(day)}
+    {@const done = dayDone(day.day_id)}
     <button
       class="pill tap"
       data-active={active ? '' : undefined}
       data-cardio={cardio ? '' : undefined}
-      aria-label={day.day_name}
+      data-done={done ? '' : undefined}
+      aria-label={done ? day.day_name + ' — выполнено' : day.day_name}
       aria-pressed={active}
       data-testid="day-tab"
       onclick={() => selectDay(day.day_id)}
@@ -30,6 +32,7 @@
         </svg>
       {/if}
       {day.day_name}
+      {#if done}<span class="tab-done" aria-hidden="true">✓</span>{/if}
     </button>
   {/each}
 </div>
@@ -56,5 +59,14 @@
   .pill:disabled {
     opacity: 0.45;
     cursor: default;
+  }
+  /* выполненный день: галочка + зелёная окантовка (когда не активен) */
+  .tab-done {
+    margin-left: 5px;
+    color: var(--ok);
+    font-weight: 700;
+  }
+  .pill[data-done]:not([data-active]) {
+    border-color: var(--ok);
   }
 </style>

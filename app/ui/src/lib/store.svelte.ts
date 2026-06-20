@@ -24,3 +24,4 @@ export {
 export { loadPlan, fetchPlan } from './store/plan.js'
 export { syncNow, initOnlineListener, syncStatus } from './store/sync.js'
 export { saveSettings } from './store/settings.js'
+export { dayDone } from './store/progress.js'

@@ -11,8 +11,9 @@
  */
 import {
   parsePlanValues, validatePayload, validateCardioPayload,
-  buildSessionRows, buildCardioRow,
+  buildSessionRows, buildCardioRow, sanitizePrefs, parseSessionProgress, parseCardioProgress,
   type Plan, type SessionPayload, type CardioPayload, type ValidationResult, type SaveResult, type SheetRow,
+  type Prefs, type BootstrapResult, type ProgressMap,
 } from './logic'
 
 const PLAN_PREFIX = 'План: '   // план = вкладка с таким префиксом, напр. «План: fullbody»
@@ -45,6 +46,55 @@ function getPlan(planName?: string): Plan {
   const p = parsePlanValues(rng.getValues(), rng.getNotes()) // values + заметки ячеек (контекст упражнений)
   p.plan = name // имя плана (без префикса)
   return p
+}
+
+// === Серверные настройки (prefs) и единый bootstrap ===
+// ВАЖНО: single-user storage. Доступ к web app — «только я» (Workspace), поэтому ScriptProperties
+// (глобальные на скрипт) корректны как пер-пользовательское хранилище. Multi-user НЕ поддерживается.
+const PREFS_PROP = 'PREFS'
+
+/** Прочитать prefs: блоб PREFS (план/неделя/день/звук) + серверный SHARED_SECRET (отдаём клиенту для payload — localStorage ломается в iframe на iOS). */
+// `export` — для unit-тестов; gen-gs.mjs срезает его при генерации server.gs.
+export function getPrefs(): Prefs {
+  const props = PropertiesService.getScriptProperties()
+  let stored: Prefs = {}
+  try { stored = JSON.parse(props.getProperty(PREFS_PROP) || '{}') } catch (e) { stored = {} }
+  const secret = props.getProperty('SHARED_SECRET') || ''
+  return { ...sanitizePrefs(stored), secret: secret }
+}
+
+/** Перезаписать prefs целиком (клиент шлёт полный снимок) — last-write-wins, без read-modify-write → без гонок. Секрет (SHARED_SECRET) не трогаем. */
+export function setPrefs(full: Prefs): { ok: true } {
+  PropertiesService.getScriptProperties().setProperty(PREFS_PROP, JSON.stringify(sanitizePrefs(full)))
+  return { ok: true }
+}
+
+/** Факт выполненных дней (read-only) для плана+недели: «Сессии» (силовые) + «Кардио». День → записанные подходы/поля. */
+export function getProgress(planName: string, week: string): ProgressMap {
+  const ss = SpreadsheetApp.getActive()
+  const out: ProgressMap = {}
+  const sessions = ss.getSheetByName(SESSIONS_SHEET)
+  if (sessions && sessions.getLastRow() >= 2) {
+    const m = parseSessionProgress(sessions.getDataRange().getValues(), planName, week)
+    Object.keys(m).forEach((d) => { out[d] = m[d] })
+  }
+  const cardio = ss.getSheetByName(CARDIO_SHEET)
+  if (cardio && cardio.getLastRow() >= 2) {
+    const m = parseCardioProgress(cardio.getDataRange().getValues(), planName, week)
+    Object.keys(m).forEach((d) => { out[d] = m[d] })
+  }
+  return out
+}
+
+/** Единый стартовый вызов: планы + prefs + план + progress за один round-trip. Приоритет плана: явный planName побеждает prefs. */
+export function bootstrap(planName?: string): BootstrapResult {
+  const prefs = getPrefs()
+  const plan = getPlan(planName || prefs.plan_name)
+  const weeks = plan.weeks || []
+  // Неделя для progress — сохранённая (если валидна), иначе дефолт (последняя) — как initAfterPlan на клиенте.
+  const week = prefs.last_week && weeks.indexOf(prefs.last_week) >= 0 ? prefs.last_week : weeks[weeks.length - 1] || ''
+  const progress = getProgress(plan.plan || '', week)
+  return { plans: listPlans(), prefs: prefs, plan: plan, progress: progress }
 }
 
 /**
